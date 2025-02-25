@@ -4,7 +4,8 @@ import os
 import uuid
 from gif_processor import extract_frames, process_frames, create_chunked_gifs  # Import functions
 
-app = Flask(__name__)
+# Create the Flask application instance
+app = Flask('__name__')
 
 # Configure Celery
 app.config['CELERY_BROKER_URL'] = 'redis://redis:6379/0'
@@ -52,6 +53,31 @@ def process_gif(input_path, output_path):
     create_chunked_gifs(green_frames_folder, output_path)
 
     return output_path
+@app.route('/hello')
+def hello_world():
+    return jsonify({
+        "status": "success",
+        "message": "Hello DATASOURCE!"
+    })
+@app.route('/status/<task_id>', methods=['GET'])
+def get_status(task_id):
+    task = celery.AsyncResult(task_id)
+    if task.state == 'PENDING':
+        response = {
+            'state': task.state,
+            'status': 'Pending...'
+        }
+    elif task.state != 'FAILURE':
+        response = {
+            'state': task.state,
+            'status': task.info  # The output path of the processed GIF
+        }
+    else:
+        response = {
+            'state': task.state,
+            'status': str(task.info)  # Exception raised
+        }
+    return jsonify(response)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
